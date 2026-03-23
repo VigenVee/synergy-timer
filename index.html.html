@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SME Synergy Master - Pro Version</title>
+    <style>
+        :root { 
+            --deep-blue: #002147; --gold: #D4AF37; --white: #ffffff; 
+            --pause-orange: #e67e22; --reset-grey: #555555; 
+            --random-purple: #6c5ce7; --alert-red: #8b0000;
+            --star-yellow: #ffdf00;
+        }
+        body { 
+            background-color: var(--deep-blue); color: var(--white); 
+            font-family: 'Segoe UI', sans-serif; display: flex; 
+            flex-direction: column; align-items: center; justify-content: center; 
+            min-height: 100vh; margin: 0; transition: background-color 0.5s ease; 
+        }
+        .container { 
+            border: 4px solid var(--gold); padding: 2rem; border-radius: 20px; 
+            background: rgba(0, 0, 0, 0.4); width: 90%; max-width: 950px; 
+            text-align: center; backdrop-filter: blur(10px); margin: 20px;
+        }
+        h1 { color: var(--gold); text-transform: uppercase; letter-spacing: 3px; margin: 10px 0; }
+        #timer-display { font-size: 7rem; font-weight: bold; margin: 5px 0; font-family: 'Courier New', monospace; }
+        #status-area { background: var(--gold); color: var(--deep-blue); padding: 0.8rem; font-size: 1.4rem; font-weight: bold; border-radius: 10px; margin-bottom: 1rem; }
+        .scoreboard { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 20px 0; padding: 15px; background: rgba(255, 255, 255, 0.1); border-radius: 15px; }
+        .team-score { display: flex; flex-direction: column; align-items: center; border-right: 1px solid rgba(212, 175, 55, 0.3); }
+        .team-score:last-child { border-right: none; }
+        .team-name { font-size: 0.8rem; color: var(--gold); font-weight: bold; margin-bottom: 5px; }
+        .star-icon { font-size: 2rem; cursor: pointer; transition: 0.2s; color: rgba(255, 255, 255, 0.2); }
+        .star-icon.active { color: var(--star-yellow); text-shadow: 0 0 10px var(--star-yellow); }
+        .score-count { font-size: 1.2rem; font-weight: bold; margin-top: 5px; }
+        .button-group { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+        button { padding: 0.7rem 1rem; font-size: 0.85rem; font-weight: bold; cursor: pointer; border: none; border-radius: 8px; transition: 0.3s; text-transform: uppercase; }
+        .btn-prep { background: var(--white); color: var(--deep-blue); }
+        .btn-perform { background: var(--gold); color: var(--deep-blue); }
+        .btn-pause { background: var(--pause-orange); color: white; }
+        .btn-reset { background: var(--reset-grey); color: white; }
+        .btn-random { background: var(--random-purple); color: white; flex-basis: 100%; margin-top: 10px; font-size: 1.1rem;}
+        @keyframes pulse-red { 0% { background-color: var(--deep-blue); } 50% { background-color: var(--alert-red); } 100% { background-color: var(--deep-blue); } }
+        .warning-state { animation: pulse-red 1s infinite; }
+        .victory-state { background-color: var(--gold) !important; }
+    </style>
+</head>
+<body id="main-body">
+
+    <div class="container">
+        <h1>Workshop Synergy Master</h1>
+        <div id="status-area">Data Loaded from Browser</div>
+        <div id="timer-display">10:00</div>
+
+        <div class="scoreboard" id="scoreboard"></div>
+
+        <div class="button-group">
+            <button class="btn-prep" onclick="startTimer(600, 'Prep Mode')">Start Prep</button>
+            <button class="btn-perform" onclick="startTimer(60, 'Performance Mode')">Start Performance</button>
+            <button id="pauseBtn" class="btn-pause" onclick="togglePause()">Pause</button>
+            <button class="btn-reset" onclick="resetTimer()">Reset All</button>
+            <button class="btn-random" onclick="pickGroup()">🎲 Who's Next?</button>
+        </div>
+    </div>
+
+    <audio id="drumBeat" preload="auto">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        let countdown;
+        let timeLeft;
+        let currentMode;
+        let isPaused = false;
+        
+        // Default Teams
+        let teams = [
+            { id: 0, name: 'ALPHA', stars: 0 },
+            { id: 1, name: 'BRAVO', stars: 0 },
+            { id: 2, name: 'CHARLIE', stars: 0 },
+            { id: 3, name: 'DELTA', stars: 0 },
+            { id: 4, name: 'ECHO', stars: 0 }
+        ];
+
+        let remainingTeams = [...teams];
+        const body = document.getElementById('main-body');
+        const timerDisplay = document.getElementById('timer-display');
+        const statusArea = document.getElementById('status-area');
+        const drumSound = document.getElementById('drumBeat');
+        const scoreboardDiv = document.getElementById('scoreboard');
+
+        // PERSISTENCE LOGIC
+        function loadFromBrowser() {
+            const savedData = localStorage.getItem('synergyScores');
+            if (savedData) {
+                teams = JSON.parse(savedData);
+                statusArea.innerText = "Welcome Back, Vee!";
+            }
+            initScoreboard();
+        }
+
+        function saveToBrowser() {
+            localStorage.setItem('synergyScores', JSON.stringify(teams));
+        }
+
+        function initScoreboard() {
+            scoreboardDiv.innerHTML = '';
+            teams.forEach(team => {
+                const teamDiv = document.createElement('div');
+                teamDiv.className = 'team-score';
+                teamDiv.innerHTML = `
+                    <div class="team-name">${team.name}</div>
+                    <div class="star-icon ${team.stars > 0 ? 'active' : ''}" onclick="addStar(${team.id})">★</div>
+                    <div class="score-count">${team.stars}</div>
+                `;
+                scoreboardDiv.appendChild(teamDiv);
+            });
+        }
+
+        function addStar(teamId) {
+            teams[teamId].stars++;
+            saveToBrowser();
+            initScoreboard();
+            body.style.backgroundColor = "rgba(212, 175, 55, 0.2)";
+            setTimeout(() => { if(!isPaused) body.style.backgroundColor = ""; }, 200);
+        }
+
+        function startTimer(seconds, mode) {
+            clearInterval(countdown);
+            isPaused = false;
+            timeLeft = seconds;
+            currentMode = mode;
+            body.classList.remove('warning-state', 'victory-state');
+            statusArea.innerText = "🔥 " + currentMode + " ACTIVE";
+            
+            countdown = setInterval(() => {
+                if (!isPaused) {
+                    timeLeft--;
+                    updateDisplay(timeLeft);
+                    if (timeLeft <= 10 && timeLeft > 0) body.classList.add('warning-state');
+                    if (currentMode === 'Prep Mode' && timeLeft === 15) playDrums();
+                    if (currentMode === 'Performance Mode' && timeLeft === 5) playDrums();
+                    if (timeLeft <= 0) {
+                        clearInterval(countdown);
+                        body.classList.remove('warning-state');
+                        body.classList.add('victory-state');
+                        statusArea.innerText = "🏁 SESSION COMPLETE";
+                    }
+                }
+            }, 1000);
+        }
+
+        function togglePause() {
+            if (!timeLeft) return;
+            isPaused = !isPaused;
+            document.getElementById('pauseBtn').innerText = isPaused ? "Resume" : "Pause";
+            statusArea.innerText = isPaused ? "⏸️ PAUSED" : "🔥 " + currentMode;
+            if (isPaused) body.classList.remove('warning-state');
+            else if (timeLeft <= 10) body.classList.add('warning-state');
+        }
+
+        function playDrums() { drumSound.play().catch(e => {}); }
+
+        function pickGroup() {
+            if (remainingTeams.length === 0) {
+                statusArea.innerText = "📢 ALL DONE!";
+                remainingTeams = [...teams];
+                return;
+            }
+            const randomIndex = Math.floor(Math.random() * remainingTeams.length);
+            const selected = remainingTeams.splice(randomIndex, 1)[0];
+            statusArea.innerText = "🎯 NEXT: TEAM " + selected.name;
+        }
+
+        function resetTimer() {
+            if(confirm("This will clear all stars and reset the timer. Proceed?")) {
+                clearInterval(countdown);
+                localStorage.removeItem('synergyScores');
+                location.reload(); // Hard reset
+            }
+        }
+
+        function updateDisplay(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            timerDisplay.innerText = `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        }
+
+        // Initial Load
+        loadFromBrowser();
+    </script>
+</body>
+</html>
