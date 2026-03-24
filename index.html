@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>SME Synergy Master - Pro Version</title>
+    <title>SME Synergy Master - Leaderboard Edition</title>
     <style>
         :root { 
             --deep-blue: #002147; --gold: #D4AF37; --white: #ffffff; 
             --pause-orange: #e67e22; --reset-grey: #555555; 
             --random-purple: #6c5ce7; --alert-red: #8b0000;
-            --star-yellow: #ffdf00;
+            --star-yellow: #ffdf00; --challenge-teal: #1abc9c;
         }
         body { 
             background-color: var(--deep-blue); color: var(--white); 
@@ -22,22 +22,55 @@
             text-align: center; backdrop-filter: blur(10px); margin: 20px;
         }
         h1 { color: var(--gold); text-transform: uppercase; letter-spacing: 3px; margin: 10px 0; }
+        
+        #challenge-box {
+            background: rgba(26, 188, 156, 0.2);
+            border: 2px dashed var(--challenge-teal);
+            padding: 1.5rem; border-radius: 15px; margin-bottom: 1rem;
+            min-height: 80px; display: flex; flex-direction: column; justify-content: center;
+        }
+        #challenge-title { color: var(--challenge-teal); font-weight: bold; text-transform: uppercase; font-size: 0.9rem; margin-bottom: 5px; }
+        #challenge-text { font-size: 1.3rem; font-style: italic; color: var(--white); }
+
         #timer-display { font-size: 7rem; font-weight: bold; margin: 5px 0; font-family: 'Courier New', monospace; }
         #status-area { background: var(--gold); color: var(--deep-blue); padding: 0.8rem; font-size: 1.4rem; font-weight: bold; border-radius: 10px; margin-bottom: 1rem; }
+        
+        /* SCOREBOARD & LEADER ANIMATION */
         .scoreboard { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 20px 0; padding: 15px; background: rgba(255, 255, 255, 0.1); border-radius: 15px; }
-        .team-score { display: flex; flex-direction: column; align-items: center; border-right: 1px solid rgba(212, 175, 55, 0.3); }
+        
+        .team-score { 
+            display: flex; flex-direction: column; align-items: center; 
+            border-right: 1px solid rgba(212, 175, 55, 0.3);
+            transition: all 0.5s ease;
+            padding: 10px 0;
+            border-radius: 10px;
+        }
         .team-score:last-child { border-right: none; }
+
+        /* THE LEADER GLOW */
+        .leader-glow {
+            background: rgba(212, 175, 55, 0.2);
+            transform: scale(1.1);
+            box-shadow: 0 0 20px var(--gold);
+            border-right: none;
+        }
+
         .team-name { font-size: 0.8rem; color: var(--gold); font-weight: bold; margin-bottom: 5px; }
         .star-icon { font-size: 2rem; cursor: pointer; transition: 0.2s; color: rgba(255, 255, 255, 0.2); }
         .star-icon.active { color: var(--star-yellow); text-shadow: 0 0 10px var(--star-yellow); }
         .score-count { font-size: 1.2rem; font-weight: bold; margin-top: 5px; }
+        
         .button-group { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
         button { padding: 0.7rem 1rem; font-size: 0.85rem; font-weight: bold; cursor: pointer; border: none; border-radius: 8px; transition: 0.3s; text-transform: uppercase; }
         .btn-prep { background: var(--white); color: var(--deep-blue); }
         .btn-perform { background: var(--gold); color: var(--deep-blue); }
         .btn-pause { background: var(--pause-orange); color: white; }
         .btn-reset { background: var(--reset-grey); color: white; }
-        .btn-random { background: var(--random-purple); color: white; flex-basis: 100%; margin-top: 10px; font-size: 1.1rem;}
+        .btn-random { background: var(--random-purple); color: white; flex-basis: 48%; margin-top: 10px; }
+        .btn-challenge { background: var(--challenge-teal); color: white; flex-basis: 48%; margin-top: 10px; }
+        
+        .speech-control { margin-top: 10px; font-size: 0.8rem; color: var(--gold); }
+
         @keyframes pulse-red { 0% { background-color: var(--deep-blue); } 50% { background-color: var(--alert-red); } 100% { background-color: var(--deep-blue); } }
         .warning-state { animation: pulse-red 1s infinite; }
         .victory-state { background-color: var(--gold) !important; }
@@ -47,7 +80,13 @@
 
     <div class="container">
         <h1>Workshop Synergy Master</h1>
-        <div id="status-area">Data Loaded from Browser</div>
+        
+        <div id="challenge-box">
+            <div id="challenge-title">Active Challenge</div>
+            <div id="challenge-text">Ready for your challenge?</div>
+        </div>
+
+        <div id="status-area">System Ready</div>
         <div id="timer-display">10:00</div>
 
         <div class="scoreboard" id="scoreboard"></div>
@@ -57,7 +96,13 @@
             <button class="btn-perform" onclick="startTimer(60, 'Performance Mode')">Start Performance</button>
             <button id="pauseBtn" class="btn-pause" onclick="togglePause()">Pause</button>
             <button class="btn-reset" onclick="resetTimer()">Reset All</button>
+            
             <button class="btn-random" onclick="pickGroup()">🎲 Who's Next?</button>
+            <button class="btn-challenge" onclick="generateChallenge()">💡 New Challenge</button>
+        </div>
+
+        <div class="speech-control">
+            <input type="checkbox" id="voiceToggle" checked> <label for="voiceToggle">Enable AI Voice Assistant</label>
         </div>
     </div>
 
@@ -71,7 +116,19 @@
         let currentMode;
         let isPaused = false;
         
-        // Default Teams
+        const workshopChallenges = [
+            "The Federal Highway Jam: Navigate a flash flood in your 2m circle without stalling.",
+            "The Sudden LHDN Audit: Form a human chain and pass invisible files without breaking the flow.",
+            "The Viral TikTok Pitch: Create a 30s synchronized corporate jingle with body percussion.",
+            "The Makan Consensus: Use non-verbal cues to decide on a 'Nasi Kandar' celebration.",
+            "The Pantry Power Trip: Act out a backup generator kicking in—start slow, move to high-voltage hum.",
+            "The Open House Rush: 'The Human Buffet Line'—synchronize serving 100 guests in your circle.",
+            "The Expo Booth Scramble: Rotate positions perfectly so the 'Customer' always sees a smiling face.",
+            "The Grab Rider Navigation: Lean and turn in perfect unison to dodge traffic and find the lobby.",
+            "The Boss is CC-ed: Perform a high-speed 'Digital Fire Drill'—typing, deleting, and praying.",
+            "The Monday Morning Teh Tarik: Simulate a continuous, flowing tea-pulling loop that never breaks."
+        ];
+
         let teams = [
             { id: 0, name: 'ALPHA', stars: 0 },
             { id: 1, name: 'BRAVO', stars: 0 },
@@ -86,26 +143,44 @@
         const statusArea = document.getElementById('status-area');
         const drumSound = document.getElementById('drumBeat');
         const scoreboardDiv = document.getElementById('scoreboard');
+        const challengeText = document.getElementById('challenge-text');
+        const voiceToggle = document.getElementById('voiceToggle');
 
-        // PERSISTENCE LOGIC
+        function speakText(text) {
+            if (!voiceToggle.checked) return;
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 0.9;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function generateChallenge() {
+            const randomIdx = Math.floor(Math.random() * workshopChallenges.length);
+            const selectedText = workshopChallenges[randomIdx];
+            challengeText.innerText = selectedText;
+            speakText("Your challenge is: " + selectedText);
+            challengeText.style.opacity = 0;
+            setTimeout(() => { challengeText.style.opacity = 1; }, 100);
+        }
+
         function loadFromBrowser() {
             const savedData = localStorage.getItem('synergyScores');
-            if (savedData) {
-                teams = JSON.parse(savedData);
-                statusArea.innerText = "Welcome Back, Vee!";
-            }
+            if (savedData) { teams = JSON.parse(savedData); }
             initScoreboard();
         }
 
-        function saveToBrowser() {
-            localStorage.setItem('synergyScores', JSON.stringify(teams));
-        }
+        function saveToBrowser() { localStorage.setItem('synergyScores', JSON.stringify(teams)); }
 
         function initScoreboard() {
             scoreboardDiv.innerHTML = '';
+            
+            // Find the highest score
+            const maxStars = Math.max(...teams.map(t => t.stars));
+
             teams.forEach(team => {
+                const isLeader = maxStars > 0 && team.stars === maxStars;
                 const teamDiv = document.createElement('div');
-                teamDiv.className = 'team-score';
+                teamDiv.className = `team-score ${isLeader ? 'leader-glow' : ''}`;
                 teamDiv.innerHTML = `
                     <div class="team-name">${team.name}</div>
                     <div class="star-icon ${team.stars > 0 ? 'active' : ''}" onclick="addStar(${team.id})">★</div>
@@ -119,8 +194,7 @@
             teams[teamId].stars++;
             saveToBrowser();
             initScoreboard();
-            body.style.backgroundColor = "rgba(212, 175, 55, 0.2)";
-            setTimeout(() => { if(!isPaused) body.style.backgroundColor = ""; }, 200);
+            speakText("One star for Team " + teams[teamId].name);
         }
 
         function startTimer(seconds, mode) {
@@ -130,11 +204,13 @@
             currentMode = mode;
             body.classList.remove('warning-state', 'victory-state');
             statusArea.innerText = "🔥 " + currentMode + " ACTIVE";
-            
+            speakText(currentMode + " started.");
+
             countdown = setInterval(() => {
                 if (!isPaused) {
                     timeLeft--;
                     updateDisplay(timeLeft);
+                    if (timeLeft === 10) speakText("Ten seconds remaining!");
                     if (timeLeft <= 10 && timeLeft > 0) body.classList.add('warning-state');
                     if (currentMode === 'Prep Mode' && timeLeft === 15) playDrums();
                     if (currentMode === 'Performance Mode' && timeLeft === 5) playDrums();
@@ -143,6 +219,7 @@
                         body.classList.remove('warning-state');
                         body.classList.add('victory-state');
                         statusArea.innerText = "🏁 SESSION COMPLETE";
+                        speakText("Time is up! Great work everyone.");
                     }
                 }
             }, 1000);
@@ -153,8 +230,6 @@
             isPaused = !isPaused;
             document.getElementById('pauseBtn').innerText = isPaused ? "Resume" : "Pause";
             statusArea.innerText = isPaused ? "⏸️ PAUSED" : "🔥 " + currentMode;
-            if (isPaused) body.classList.remove('warning-state');
-            else if (timeLeft <= 10) body.classList.add('warning-state');
         }
 
         function playDrums() { drumSound.play().catch(e => {}); }
@@ -168,13 +243,13 @@
             const randomIndex = Math.floor(Math.random() * remainingTeams.length);
             const selected = remainingTeams.splice(randomIndex, 1)[0];
             statusArea.innerText = "🎯 NEXT: TEAM " + selected.name;
+            speakText("Next up is Team " + selected.name);
         }
 
         function resetTimer() {
-            if(confirm("This will clear all stars and reset the timer. Proceed?")) {
-                clearInterval(countdown);
+            if(confirm("Reset everything?")) {
                 localStorage.removeItem('synergyScores');
-                location.reload(); // Hard reset
+                location.reload();
             }
         }
 
@@ -184,7 +259,6 @@
             timerDisplay.innerText = `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
         }
 
-        // Initial Load
         loadFromBrowser();
     </script>
 </body>
